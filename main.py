@@ -1,10 +1,9 @@
 import os
 import threading
 from flask import Flask
-
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
@@ -12,7 +11,6 @@ from telegram.ext import (
     filters,
 )
 
-# ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8293984966
 
@@ -21,7 +19,6 @@ GROUP_USERNAME = "@parvezkhan_654"
 
 REDEEM_LIMIT = 5
 
-# ================= GIVEAWAY DATA =================
 current_code = "GIFT-CHATGPT1246"
 current_data = """ChatGPT Plus
 
@@ -35,7 +32,7 @@ example123
 redeemed_users = set()
 successful_redeems = 0
 
-# ================= FLASK (Render keep-alive) =================
+# ---------------- Flask ----------------
 app = Flask(__name__)
 
 @app.route("/")
@@ -46,7 +43,7 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= HELPERS =================
+# ---------------- Helpers ----------------
 async def is_member(context, chat, user_id):
     try:
         m = await context.bot.get_chat_member(chat, user_id)
@@ -60,14 +57,12 @@ async def joined_both(context, user_id):
         and await is_member(context, GROUP_USERNAME, user_id)
     )
 
-# ================= /start =================
+# ---------------- Bot ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if user_id == ADMIN_ID:
-        await update.message.reply_text(
-            "👑 Admin Mode\n\n/update CODE | Giveaway text"
-        )
+        await update.message.reply_text("👑 Admin Mode\n\n/update CODE | Giveaway text")
         return
 
     keyboard = InlineKeyboardMarkup([
@@ -81,67 +76,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-# ================= CHECK JOIN =================
 async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
 
-    user_id = query.from_user.id
-
-    if not await joined_both(context, user_id):
-        await query.answer("❌ আগে Channel ও Group join করো", show_alert=True)
+    if not await joined_both(context, q.from_user.id):
+        await q.answer("❌ আগে join করো", show_alert=True)
         return
 
-    await query.message.edit_text(
-        "🎁 Ready to redeem!",
+    await q.message.edit_text(
+        "🎁 Ready!",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
+            [InlineKeyboardButton("🎁 Redeem", callback_data="redeem")]
         ])
     )
 
-# ================= ASK CODE =================
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
+    context.user_data["redeem"] = True
+    await q.message.reply_text("Redeem code পাঠাও:")
 
-    context.user_data.clear()
-    context.user_data["awaiting_redeem"] = True
-    await query.message.reply_text("👉 Redeem code পাঠাও:")
-
-# ================= USER REDEEM =================
 async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global successful_redeems
 
-    if not context.user_data.get("awaiting_redeem"):
+    if not context.user_data.get("redeem"):
         return
 
     user_id = update.effective_user.id
     code = update.message.text.strip()
 
-    if not await joined_both(context, user_id):
-        await update.message.reply_text("❌ Please join channel & group first")
-        return
-
     if user_id in redeemed_users:
-        await update.message.reply_text("⚠️ তুমি আগেই redeem করেছো")
-        return
-
-    if successful_redeems >= REDEEM_LIMIT and user_id != ADMIN_ID:
-        await update.message.reply_text("🚫 Giveaway limit শেষ")
+        await update.message.reply_text("⚠️ Already redeemed")
         return
 
     if code != current_code:
-        await update.message.reply_text("❌ Invalid redeem code")
+        await update.message.reply_text("❌ Wrong code")
         return
 
     redeemed_users.add(user_id)
-    if user_id != ADMIN_ID:
-        successful_redeems += 1
-
+    successful_redeems += 1
     context.user_data.clear()
-    await update.message.reply_text(f"✅ Redeem successful!\n\n{current_data}")
 
-# ================= ADMIN UPDATE =================
+    await update.message.reply_text(f"✅ Success!\n\n{current_data}")
+
 async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_code, current_data, redeemed_users, successful_redeems
 
@@ -154,19 +132,16 @@ async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         current_code = code.strip()
         current_data = text.strip()
-
         redeemed_users.clear()
         successful_redeems = 0
 
-        await update.message.reply_text("✅ Giveaway updated successfully.")
+        await update.message.reply_text("✅ Updated")
     except:
-        await update.message.reply_text(
-            "❌ Format ভুল\n\n/update CODE | Giveaway text"
-        )
+        await update.message.reply_text("❌ /update CODE | text")
 
-# ================= BOT =================
+# ---------------- Main ----------------
 def run_bot():
-    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
+    app_bot = Application.builder().token(BOT_TOKEN).build()
 
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("update", update_code))
@@ -174,10 +149,8 @@ def run_bot():
     app_bot.add_handler(CallbackQueryHandler(redeem, pattern="redeem"))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
 
-    print("🤖 Bot running (Render FREE)")
     app_bot.run_polling()
 
-# ================= MAIN =================
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
     run_bot()
