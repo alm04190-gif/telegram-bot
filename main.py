@@ -14,7 +14,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8293984966
 
 CHANNEL_USERNAME = "@parvezkhan_00"
-GROUP_USERNAME   = "@parvezkhan_654"
+GROUP_USERNAME = "@parvezkhan_654"
 
 REDEEM_LIMIT = 5
 
@@ -35,8 +35,8 @@ successful_redeems = 0
 # ================= HELPERS =================
 async def is_member(context, chat, user_id):
     try:
-        member = await context.bot.get_chat_member(chat, user_id)
-        return member.status in ("member", "administrator", "creator")
+        m = await context.bot.get_chat_member(chat, user_id)
+        return m.status in ("member", "administrator", "creator")
     except:
         return False
 
@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id == ADMIN_ID:
         await update.message.reply_text(
-            "👑 Admin Mode\n\nUpdate format:\n/update CODE | Giveaway text"
+            "👑 Admin Mode\n\n/update CODE | Giveaway text"
         )
         return
 
@@ -92,7 +92,6 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.clear()
     context.user_data["awaiting_redeem"] = True
-
     await query.message.reply_text("👉 Redeem code পাঠাও:")
 
 # ================= USER REDEEM =================
@@ -126,10 +125,7 @@ async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         successful_redeems += 1
 
     context.user_data.clear()
-
-    await update.message.reply_text(
-        f"✅ Redeem successful!\n\n{current_data}"
-    )
+    await update.message.reply_text(f"✅ Redeem successful!\n\n{current_data}")
 
 # ================= ADMIN UPDATE =================
 async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -151,7 +147,7 @@ async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Giveaway updated successfully.")
     except:
         await update.message.reply_text(
-            "❌ Format ভুল\n\nসঠিক:\n/update CODE | Giveaway text"
+            "❌ Format ভুল\n\n/update CODE | Giveaway text"
         )
 
 # ================= MAIN =================
@@ -160,13 +156,11 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("update", update_code))
-
     app.add_handler(CallbackQueryHandler(check_join, pattern="check_join"))
     app.add_handler(CallbackQueryHandler(redeem, pattern="redeem"))
-
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
 
-    print("🤖 Bot running (Render)")
+    print("🤖 Bot running (stable)")
     app.run_polling()
 
 if __name__ == "__main__":
