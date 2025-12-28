@@ -1,4 +1,7 @@
 import os
+import threading
+from flask import Flask
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -31,6 +34,17 @@ example123
 
 redeemed_users = set()
 successful_redeems = 0
+
+# ================= FLASK (Render keep-alive) =================
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 # ================= HELPERS =================
 async def is_member(context, chat, user_id):
@@ -150,18 +164,20 @@ async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ Format ভুল\n\n/update CODE | Giveaway text"
         )
 
+# ================= BOT =================
+def run_bot():
+    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CommandHandler("update", update_code))
+    app_bot.add_handler(CallbackQueryHandler(check_join, pattern="check_join"))
+    app_bot.add_handler(CallbackQueryHandler(redeem, pattern="redeem"))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
+
+    print("🤖 Bot running (Render FREE)")
+    app_bot.run_polling()
+
 # ================= MAIN =================
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("update", update_code))
-    app.add_handler(CallbackQueryHandler(check_join, pattern="check_join"))
-    app.add_handler(CallbackQueryHandler(redeem, pattern="redeem"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
-
-    print("🤖 Bot running (stable)")
-    app.run_polling()
-
 if __name__ == "__main__":
-    main()
+    threading.Thread(target=run_web).start()
+    run_bot()
