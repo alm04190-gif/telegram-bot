@@ -1,19 +1,17 @@
 import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    Updater,
+    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
-    Filters,
-    CallbackContext,
+    ContextTypes,
+    filters,
 )
 
-print("🔥 V13 GIVEAWAY BOT RUNNING 🔥")
-
 # ================= CONFIG =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Render ENV
-ADMIN_ID = 123456789  # নিজের Telegram ID
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # 🔥 Render ENV
+ADMIN_ID = 123456789  # ← নিজের Telegram ID দাও
 
 CHANNEL_USERNAME = "@your_channel"
 GROUP_USERNAME = "@your_group"
@@ -35,65 +33,69 @@ redeemed_users = set()
 successful_redeems = 0
 
 # ================= HELPERS =================
-def is_member(bot, chat, user_id):
+async def is_member(context, chat, user_id):
     try:
-        member = bot.get_chat_member(chat, user_id)
+        member = await context.bot.get_chat_member(chat, user_id)
         return member.status in ("member", "administrator", "creator")
     except:
         return False
 
-def joined_both(bot, user_id):
+async def joined_both(context, user_id):
     return (
-        is_member(bot, CHANNEL_USERNAME, user_id)
-        and is_member(bot, GROUP_USERNAME, user_id)
+        await is_member(context, CHANNEL_USERNAME, user_id)
+        and await is_member(context, GROUP_USERNAME, user_id)
     )
 
 # ================= /start =================
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     name = user.first_name or "there"
 
-    text = f"👋 Welcome, {name}!\n\nThis is the Giveaway Management Bot."
+    text = (
+        f"👋 Welcome, {name}!\n\n"
+        "This is the Giveaway Management Bot."
+    )
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
     ])
 
-    update.message.reply_text(text, reply_markup=keyboard)
+    await update.message.reply_text(text, reply_markup=keyboard)
 
 # ================= Redeem =================
-def redeem(update: Update, context: CallbackContext):
+async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔔 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
-        [InlineKeyboardButton("👥 Join Group", url=f"https://t.me/{GROUP_USERNAME[1:]}")],
+    join_keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔔 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}")],
+        [InlineKeyboardButton("👥 Join Group", url=f"https://t.me/{GROUP_USERNAME.lstrip('@')}")],
         [InlineKeyboardButton("✅ Check Join", callback_data="check_join")]
     ])
 
-    query.message.edit_text(
+    await query.message.edit_text(
         "Redeem করার আগে Channel ও Group join করো 👇",
-        reply_markup=keyboard
+        reply_markup=join_keyboard
     )
 
 # ================= Check Join =================
-def check_join(update: Update, context: CallbackContext):
+async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     user_id = query.from_user.id
 
-    if not joined_both(context.bot, user_id):
-        query.answer("📌 Please join Channel & Group first", show_alert=True)
+    if not await joined_both(context, user_id):
+        await query.answer("📌 Please join Channel & Group first", show_alert=True)
         return
 
     context.user_data.clear()
     context.user_data["awaiting_code"] = True
-    query.message.edit_text("🎟️ Give Your Redeem Code")
+
+    await query.message.edit_text("🎟️ Give Your Redeem Code")
 
 # ================= Handle Code =================
-def handle_code(update: Update, context: CallbackContext):
+async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global successful_redeems
 
     if not context.user_data.get("awaiting_code"):
@@ -103,23 +105,27 @@ def handle_code(update: Update, context: CallbackContext):
     code = update.message.text.strip()
 
     if user_id in redeemed_users:
-        update.message.reply_text("⚠️ তুমি আগেই redeem করেছো")
+        await update.message.reply_text("⚠️ তুমি আগেই redeem করেছো")
         return
 
     if successful_redeems >= REDEEM_LIMIT:
-        update.message.reply_text("🚫 Giveaway limit শেষ")
+        await update.message.reply_text("🚫 Giveaway limit শেষ")
         return
 
+    # ❌ Wrong Code
     if code != current_code:
         cancel_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
         ])
-        update.message.reply_text(
-            "❌ Invalid Code!\nTry again or cancel.",
+
+        await update.message.reply_text(
+            "❌ Invalid Code!\n"
+            "Please try sending a different code, or cancel.",
             reply_markup=cancel_keyboard
         )
         return
 
+    # ✅ Correct Code
     redeemed_users.add(user_id)
     successful_redeems += 1
     context.user_data.clear()
@@ -128,15 +134,15 @@ def handle_code(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
     ])
 
-    update.message.reply_text(
+    await update.message.reply_text(
         f"✅ Redeem successful!\n\n{current_data}",
         reply_markup=redeem_again
     )
 
 # ================= Cancel =================
-def cancel(update: Update, context: CallbackContext):
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     context.user_data.clear()
 
@@ -144,13 +150,13 @@ def cancel(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
     ])
 
-    query.message.edit_text(
+    await query.message.edit_text(
         "❌ Cancelled.\n\nআবার Redeem করতে পারো 👇",
         reply_markup=keyboard
     )
 
 # ================= Admin Update =================
-def update_code(update: Update, context: CallbackContext):
+async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_code, current_data, redeemed_users, successful_redeems
 
     if update.effective_user.id != ADMIN_ID:
@@ -165,28 +171,27 @@ def update_code(update: Update, context: CallbackContext):
         redeemed_users.clear()
         successful_redeems = 0
 
-        update.message.reply_text("✅ Giveaway updated successfully.")
+        await update.message.reply_text("✅ Giveaway updated successfully.")
     except:
-        update.message.reply_text(
+        await update.message.reply_text(
             "❌ Format ভুল\n\n/update CODE | Giveaway text"
         )
 
 # ================= MAIN =================
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("update", update_code))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("update", update_code))
 
-    dp.add_handler(CallbackQueryHandler(redeem, pattern="^redeem$"))
-    dp.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
-    dp.add_handler(CallbackQueryHandler(cancel, pattern="^cancel$"))
+    app.add_handler(CallbackQueryHandler(redeem, pattern="^redeem$"))
+    app.add_handler(CallbackQueryHandler(check_join, pattern="^check_join$"))
+    app.add_handler(CallbackQueryHandler(cancel, pattern="^cancel$"))
 
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_code))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
 
-    updater.start_polling()
-    updater.idle()
+    print("🤖 Giveaway All Bot running on Render")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
