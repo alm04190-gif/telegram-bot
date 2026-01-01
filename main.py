@@ -9,6 +9,8 @@ from telegram.ext import (
     filters,
 )
 
+print("🔥 NEW CODE RUNNING 🔥")
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8293984966
 
