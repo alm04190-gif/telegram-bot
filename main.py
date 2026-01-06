@@ -1,4 +1,3 @@
-import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,17 +9,17 @@ from telegram.ext import (
 )
 
 # ================= CONFIG =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # 🔥 Render ENV
-ADMIN_ID = 123456789  # ← নিজের Telegram ID দাও
+BOT_TOKEN = "YOUR_BOT_TOKEN"
+ADMIN_ID = 123456789
 
 CHANNEL_USERNAME = "@your_channel"
-GROUP_USERNAME = "@your_group"
+GROUP_USERNAME   = "@your_group"
 
 REDEEM_LIMIT = 5
 
 # ================= GIVEAWAY DATA =================
 current_code = "GIFT-CHATGPT1246"
-current_data = """🎁 ChatGPT Plus
+current_data = """ChatGPT Plus
 
 Email:
 example@email.com
@@ -35,8 +34,8 @@ successful_redeems = 0
 # ================= HELPERS =================
 async def is_member(context, chat, user_id):
     try:
-        member = await context.bot.get_chat_member(chat, user_id)
-        return member.status in ("member", "administrator", "creator")
+        m = await context.bot.get_chat_member(chat, user_id)
+        return m.status in ("member", "administrator", "creator")
     except:
         return False
 
@@ -48,19 +47,14 @@ async def joined_both(context, user_id):
 
 # ================= /start =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    name = user.first_name or "there"
-
-    text = (
-        f"👋 Welcome, {name}!\n\n"
-        "This is the Giveaway Management Bot."
-    )
-
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
     ])
 
-    await update.message.reply_text(text, reply_markup=keyboard)
+    await update.message.reply_text(
+        "🎉 Giveaway চলছে!",
+        reply_markup=keyboard
+    )
 
 # ================= Redeem =================
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,10 +79,19 @@ async def check_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
+    # ❌ Not joined
     if not await joined_both(context, user_id):
-        await query.answer("📌 Please join Channel & Group first", show_alert=True)
+        await query.message.edit_text(
+            "📌 Please join Channel & Group first 👇",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔔 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME.lstrip('@')}")],
+                [InlineKeyboardButton("👥 Join Group", url=f"https://t.me/{GROUP_USERNAME.lstrip('@')}")],
+                [InlineKeyboardButton("✅ Check Join", callback_data="check_join")]
+            ])
+        )
         return
 
+    # ✅ Joined
     context.user_data.clear()
     context.user_data["awaiting_code"] = True
 
@@ -112,31 +115,27 @@ async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🚫 Giveaway limit শেষ")
         return
 
-    # ❌ Wrong Code
+    # ❌ Wrong code
     if code != current_code:
-        cancel_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
-        ])
-
         await update.message.reply_text(
             "❌ Invalid Code!\n"
             "Please try sending a different code, or cancel.",
-            reply_markup=cancel_keyboard
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
+            ])
         )
         return
 
-    # ✅ Correct Code
+    # ✅ Correct code
     redeemed_users.add(user_id)
     successful_redeems += 1
     context.user_data.clear()
 
-    redeem_again = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
-    ])
-
     await update.message.reply_text(
         f"✅ Redeem successful!\n\n{current_data}",
-        reply_markup=redeem_again
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
+        ])
     )
 
 # ================= Cancel =================
@@ -146,16 +145,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data.clear()
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
-    ])
-
     await query.message.edit_text(
         "❌ Cancelled.\n\nআবার Redeem করতে পারো 👇",
-        reply_markup=keyboard
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Redeem Code", callback_data="redeem")]
+        ])
     )
 
-# ================= Admin Update =================
+# ================= ADMIN UPDATE =================
 async def update_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_code, current_data, redeemed_users, successful_redeems
 
@@ -190,7 +187,7 @@ def main():
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
 
-    print("🤖 Giveaway All Bot running on Render")
+    print("🤖 Bot running (FINAL PERFECT FLOW)")
     app.run_polling()
 
 if __name__ == "__main__":
